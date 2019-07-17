@@ -7,26 +7,16 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/dweepgogia/new-manifest-verification/pkg/validate/validator"
+
 	"github.com/ghodss/yaml"
 	olm "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
+	"github.com/pkg/errors"
 )
 
-// Represents verification result for each of the yaml files from the manifest bundle.
-type manifestResult struct {
-	errors   []missingTypeError
-	warnings []missingTypeError
-}
-
-// Represents a warning or an error in a yaml file.
-type missingTypeError struct {
-	err         string
-	typeName    string
-	path        string
-	isMandatory bool
-}
-
-// Verify takes in name of the yaml file to be validated, reads it, and calls the unmarshal function on rawYaml.
-func Verify(yamlFileName string) error {
+// ValidateCSVManifest takes in name of the yaml file to be validated, reads
+// it, and calls the unmarshal function on rawYaml.
+func ValidateCSVManifest(yamlFileName string) error {
 	rawYaml, err := ioutil.ReadFile(yamlFileName)
 	if err != nil {
 		return fmt.Errorf("Error in reading %s file:   #%s ", yamlFileName, err)
@@ -38,22 +28,29 @@ func Verify(yamlFileName string) error {
 		return fmt.Errorf("Error unmarshalling YAML to OLM's csv type for %s file:  #%s ", yamlFileName, err)
 	}
 
-	// Contains error logs for all missing optional and mandatory fields.
-	errorLog := csvInspect(csv)
-	getErrorsFromManifestResult(errorLog.warnings)
-
-	// There is no mandatory field thats missing if errorLog.errors is nil.
-	if errorLog.errors != nil {
-		fmt.Println()
-		getErrorsFromManifestResult(errorLog.errors)
-		return fmt.Errorf("Populate all the mandatory fields missing from %s file.", yamlFileName)
+	v := &CSVValidator{}
+	if err = v.AddObjects(csv); err != nil {
+		return err
 	}
-	fmt.Printf("%s is verified.", yamlFileName)
+	fmt.Println("Running", v.Name())
+	for _, errorLog := range v.Validate() {
+		fmt.Println("Validating CSV", errorLog.Name)
+
+		getErrorsFromManifestResult(errorLog.Warnings)
+
+		// There is no mandatory field thats missing if errorLog.errors is nil.
+		if errorLog.Errors != nil {
+			fmt.Println()
+			getErrorsFromManifestResult(errorLog.Errors)
+			return fmt.Errorf("Populate all the mandatory fields missing from CSV %s.", csv.GetName())
+		}
+	}
+	fmt.Printf("%s is verified.\n", yamlFileName)
 	return nil
 }
 
 // Iterates over the list of warnings and errors.
-func getErrorsFromManifestResult(err []missingTypeError) {
+func getErrorsFromManifestResult(err []validator.MissingTypeError) {
 	for _, v := range err {
 		assertTypeToGetValue(v)
 	}
@@ -61,7 +58,7 @@ func getErrorsFromManifestResult(err []missingTypeError) {
 
 // Asserts type to get the underlying field value.
 func assertTypeToGetValue(v interface{}) {
-	if v, ok := v.(missingTypeError); ok {
+	if v, ok := v.(validator.MissingTypeError); ok {
 		fmt.Println(v)
 	}
 }
@@ -87,26 +84,19 @@ func unmarshal(rawYAML []byte) (olm.ClusterServiceVersion, error) {
 	return csv, nil
 }
 
-// missingTypeError strut implements the Error interface to define custom error formatting.
-func (err missingTypeError) Error() string {
-	if err.isMandatory {
-		return fmt.Sprintf("Error: Mandatory %s Missing (%s)", err.typeName, err.path)
-	} else {
-		return fmt.Sprintf("Warning: Optional %s Missing (%s)", err.typeName, err.path)
-	}
-}
-
-// Iterates over the given CSV. Returns a manifestResult type object.
-func csvInspect(val interface{}) manifestResult {
+// Iterates over the given CSV. Returns a ManifestResult type object.
+func csvInspect(val interface{}) validator.ManifestResult {
 
 	fieldValue := reflect.ValueOf(val)
 
 	switch fieldValue.Kind() {
 	case reflect.Struct:
-		return checkMissingFields(fieldValue, "", manifestResult{})
+		return checkMissingFields(fieldValue, "", validator.ManifestResult{})
 	default:
-		err := []missingTypeError{{"Error: input file is not a valid CSV.", "", "", false}}
-		return manifestResult{errors: err, warnings: nil}
+		errs := []validator.MissingTypeError{
+			{Err: errors.New("Error: input file is not a valid CSV.")},
+		}
+		return validator.ManifestResult{Errors: errs, Warnings: nil}
 	}
 }
 
@@ -123,8 +113,7 @@ func containsStrict(a []string, x string) bool {
 
 // Recursive function that traverses a nested struct passed in as reflect value, and reports for errors/warnings
 // in case of null struct field values.
-// Returns a log of errors as slice of strings.
-func checkMissingFields(v reflect.Value, parentStructName string, log manifestResult) manifestResult {
+func checkMissingFields(v reflect.Value, parentStructName string, log validator.ManifestResult) validator.ManifestResult {
 
 	for i := 0; i < v.NumField(); i++ {
 
@@ -162,15 +151,15 @@ func checkMissingFields(v reflect.Value, parentStructName string, log manifestRe
 }
 
 // Returns updated error log with missing optional/mandatory field/struct objects.
-func updateLog(log manifestResult, typeName string, newParentStructName string, emptyVal bool, isOptionalField bool) manifestResult {
+func updateLog(log validator.ManifestResult, typeName string, newParentStructName string, emptyVal bool, isOptionalField bool) validator.ManifestResult {
 
 	if emptyVal && isOptionalField {
-		errString := fmt.Sprintf("Warning: Optional %s Missing.", typeName)
-		log.warnings = append(log.warnings, missingTypeError{errString, typeName, newParentStructName, false})
+		err := errors.Errorf("Warning: Optional %s Missing.", typeName)
+		log.Warnings = append(log.Warnings, validator.MissingTypeError{err, typeName, newParentStructName, false})
 	} else if emptyVal && !isOptionalField {
 		if newParentStructName != "Status" {
-			errString := fmt.Sprintf("Error: Mandatory %s Missing.", typeName)
-			log.errors = append(log.errors, missingTypeError{errString, typeName, newParentStructName, true})
+			err := errors.Errorf("Error: Mandatory %s Missing.", typeName)
+			log.Errors = append(log.Errors, validator.MissingTypeError{err, typeName, newParentStructName, true})
 		}
 	}
 	return log
