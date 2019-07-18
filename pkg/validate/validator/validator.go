@@ -9,31 +9,104 @@ type ManifestResult struct {
 	// usually be set to object.GetName().
 	Name string
 	// Errors pertain to issues with the manifest that must be corrected.
-	Errors []MissingTypeError
+	Errors []Error
 	// Warnings pertain to issues with the manifest that are optional to correct.
-	Warnings []MissingTypeError
+	Warnings []Error
 }
 
-// MissingTypeError represents a warning or an error in a yaml file.
-type MissingTypeError struct {
-	// Err is the underlying error caused by a missing type, if any.
-	Err error
-	// TypeName is the syntactical name of missing data, ex. Struct, Field.
-	TypeName string
-	// Path is the dot-hierarchical YAML path of the missing data.
-	Path string
-	// IsMandatory determines whether the missing data should generate a
-	// warning (false, the default) or error (true).
-	IsMandatory bool
+// Error is an implementation of the 'error' interface, which represents a
+// warning or an error in a yaml file. Error type is taken as is from
+// https://github.com/operator-framework/operator-registry/blob/master/vendor/k8s.io/apimachinery/pkg/util/validation/field/errors.go#L31
+// to maintain compatibility with upstream.
+type Error struct {
+	// Type is the ErrorType string constant that represents the kind of
+	// error, ex. "MandatoryStructMissing", "I/O".
+	Type ErrorType
+	// Field is the dot-hierarchical YAML path of the missing data.
+	Field string
+	// BadValue is the field or file that caused an error or warning.
+	BadValue interface{}
+	// Detail represents the error message as a string.
+	Detail string
 }
 
-// MissingTypeError strut implements the Error interface to define custom error formatting.
-func (err MissingTypeError) Error() string {
-	if err.IsMandatory {
-		return fmt.Sprintf("Error: Mandatory %s Missing (%s)", err.TypeName, err.Path)
-	} else {
-		return fmt.Sprintf("Warning: Optional %s Missing (%s)", err.TypeName, err.Path)
+func (err Error) String() string {
+	return fmt.Sprintf("Detail: %s | Error type: %s | Value: %v | Field: %s", err.Detail, err.Type.String(), err.BadValue, err.Field)
+}
+
+type ErrorType string
+
+func InvalidCSV(detail string) Error {
+	return Error{ErrorInvalidCSV, "", "", detail}
+}
+
+func OptionalFieldMissing(field string, value interface{}, detail string) Error {
+	return Error{WarningFieldMissing, field, value, detail}
+}
+
+func MandatoryFieldMissing(field string, value interface{}, detail string) Error {
+	return Error{ErrorFieldMissing, field, value, detail}
+}
+
+func UnsupportedType(detail string) Error {
+	return Error{ErrorUnsupportedType, "", "", detail}
+}
+
+// TODO: see if more information can be extracted out of 'unmarshall/parsing' errors.
+func InvalidParse(detail string, value interface{}) Error {
+	return Error{ErrorInvalidParse, "", value, detail}
+}
+
+func IOError(detail string, value interface{}) Error {
+	return Error{ErrorIO, "", value, detail}
+}
+
+func FailedValidation(detail string, value interface{}) Error {
+	return Error{ErrorFailedValidation, "", value, detail}
+}
+
+func InvalidOperation(detail string) Error {
+	return Error{ErrorInvalidOperation, "", "", detail}
+}
+
+const (
+	ErrorInvalidCSV       ErrorType = "CSVFileNotValid"
+	WarningFieldMissing   ErrorType = "OptionalFieldNotFound"
+	ErrorFieldMissing     ErrorType = "MandatoryFieldNotFound"
+	ErrorUnsupportedType  ErrorType = "FieldTypeNotSupported"
+	ErrorInvalidParse     ErrorType = "Unmarshall/ParseError"
+	ErrorIO               ErrorType = "FileReadError"
+	ErrorFailedValidation ErrorType = "ValidationFailed"
+	ErrorInvalidOperation ErrorType = "OperationFailed"
+)
+
+// String converts a ErrorType into its corresponding canonical error message.
+func (t ErrorType) String() string {
+	switch t {
+	case ErrorInvalidCSV:
+		return "CSV file not valid"
+	case WarningFieldMissing:
+		return "Optional field not found"
+	case ErrorFieldMissing:
+		return "Mandatory field not found"
+	case ErrorUnsupportedType:
+		return "Field type not supported"
+	case ErrorInvalidParse:
+		return "Unmarshall/Parse error"
+	case ErrorIO:
+		return "File read error"
+	case ErrorFailedValidation:
+		return "Validation failed"
+	case ErrorInvalidOperation:
+		return "Operation failed"
+	default:
+		panic(fmt.Sprintf("Unrecognized validation error: %q", string(t)))
 	}
+}
+
+// Error strut implements the 'error' interface to define custom error formatting.
+func (err Error) Error() string {
+	return err.Detail
 }
 
 // ValidatorSet contains a set of Validators to be executed sequentially.
