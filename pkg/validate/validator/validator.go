@@ -31,7 +31,7 @@ type Error struct {
 }
 
 func (err Error) String() string {
-	return fmt.Sprintf("Error type: %s | Field: %s | Value: %v | Detail: %s", err.Type, err.Field, err.BadValue, err.Detail)
+	return fmt.Sprintf("Detail: %s | Error type: %s | Value: %v | Field: %s", err.Detail, err.Type.String(), err.BadValue, err.Field)
 }
 
 type ErrorType string
@@ -79,6 +79,30 @@ const (
 	ErrorFailedValidation ErrorType = "ValidationFailed"
 	ErrorInvalidOperation ErrorType = "OperationFailed"
 )
+
+// String converts a ErrorType into its corresponding canonical error message.
+func (t ErrorType) String() string {
+	switch t {
+	case ErrorInvalidCSV:
+		return "CSV file not valid"
+	case WarningFieldMissing:
+		return "Optional field not found"
+	case ErrorFieldMissing:
+		return "Mandatory field not found"
+	case ErrorUnsupportedType:
+		return "Field type not supported"
+	case ErrorInvalidParse:
+		return "Unmarshall/Parse error"
+	case ErrorIO:
+		return "File read error"
+	case ErrorFailedValidation:
+		return "Validation failed"
+	case ErrorInvalidOperation:
+		return "Operation failed"
+	default:
+		panic(fmt.Sprintf("Unrecognized validation error: %q", string(t)))
+	}
+}
 
 // Error strut implements the 'error' interface to define custom error formatting.
 func (err Error) Error() string {
