@@ -31,7 +31,8 @@ type Error struct {
 }
 
 func (err Error) String() string {
-	return fmt.Sprintf("Detail: %s | Error type: %s | Value: %v | Field: %s", err.Detail, err.Type.String(), err.BadValue, err.Field)
+	//return fmt.Sprintf("Detail: %s | Error type: %s | Value: %v | Field: %s", err.Detail, err.Type.String(), err.BadValue, err.Field)
+	return err.Error()
 }
 
 type ErrorType string
@@ -40,11 +41,15 @@ func InvalidCSV(detail string) Error {
 	return Error{ErrorInvalidCSV, "", "", detail}
 }
 
-func OptionalFieldMissing(field string, value interface{}, detail string) Error {
+func InvalidDefaultChannel(detail string, value interface{}) Error {
+	return Error{ErrorInvalidDefaultChannel, "", value, detail}
+}
+
+func OptionalFieldMissing(detail string, field string, value interface{}) Error {
 	return Error{WarningFieldMissing, field, value, detail}
 }
 
-func MandatoryFieldMissing(field string, value interface{}, detail string) Error {
+func MandatoryFieldMissing(detail string, field string, value interface{}) Error {
 	return Error{ErrorFieldMissing, field, value, detail}
 }
 
@@ -65,19 +70,20 @@ func FailedValidation(detail string, value interface{}) Error {
 	return Error{ErrorFailedValidation, "", value, detail}
 }
 
-func InvalidOperation(detail string) Error {
-	return Error{ErrorInvalidOperation, "", "", detail}
+func InvalidOperation(detail string, value interface{}) Error {
+	return Error{ErrorInvalidOperation, "", value, detail}
 }
 
 const (
-	ErrorInvalidCSV       ErrorType = "CSVFileNotValid"
-	WarningFieldMissing   ErrorType = "OptionalFieldNotFound"
-	ErrorFieldMissing     ErrorType = "MandatoryFieldNotFound"
-	ErrorUnsupportedType  ErrorType = "FieldTypeNotSupported"
-	ErrorInvalidParse     ErrorType = "Unmarshall/ParseError"
-	ErrorIO               ErrorType = "FileReadError"
-	ErrorFailedValidation ErrorType = "ValidationFailed"
-	ErrorInvalidOperation ErrorType = "OperationFailed"
+	ErrorInvalidCSV            ErrorType = "CSVFileNotValid"
+	WarningFieldMissing        ErrorType = "OptionalFieldNotFound"
+	ErrorFieldMissing          ErrorType = "MandatoryFieldNotFound"
+	ErrorUnsupportedType       ErrorType = "FieldTypeNotSupported"
+	ErrorInvalidParse          ErrorType = "Unmarshall/ParseError"
+	ErrorIO                    ErrorType = "FileReadError"
+	ErrorFailedValidation      ErrorType = "ValidationFailed"
+	ErrorInvalidOperation      ErrorType = "OperationFailed"
+	ErrorInvalidDefaultChannel ErrorType = "DefaultChannelNotValid"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
@@ -99,6 +105,8 @@ func (t ErrorType) String() string {
 		return "Validation failed"
 	case ErrorInvalidOperation:
 		return "Operation failed"
+	case ErrorInvalidDefaultChannel:
+		return "Default channel not found"
 	default:
 		panic(fmt.Sprintf("Unrecognized validation error: %q", string(t)))
 	}

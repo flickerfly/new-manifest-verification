@@ -6,11 +6,12 @@ package validator
 type Validator interface {
 	// Validate should run validation logic on an arbitrary object, and return
 	// a one ManifestResult for each object that did not pass validation.
-	// TODO: use pointers
+	// TODO: use pointers.
 	Validate() []ManifestResult
 	// AddObjects adds objects to the Validator. Each object will be validated
 	// when Validate() is called.
 	AddObjects(...interface{}) Error
 	// Name should return a succinct name for this validator.
+	// TODO: check if the return type should be ManifestResult.
 	Name() string
 }

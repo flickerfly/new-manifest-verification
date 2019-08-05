@@ -13,38 +13,41 @@ import (
 
 // ValidateCSVManifest takes in name of the yaml file to be validated, reads
 // it, and calls the unmarshal function on rawYaml.
-func ValidateCSVManifest(yamlFileName string) validator.Error {
+func ValidateCSVManifest(yamlFileName string) (manifestResult validator.ManifestResult) {
 	rawYaml, err := ioutil.ReadFile(yamlFileName)
 	if err != nil {
-		return validator.IOError(fmt.Sprintf("Error in reading %s file:   #%s ", yamlFileName, err), yamlFileName)
+		manifestResult.Errors = append(manifestResult.Errors, validator.IOError(fmt.Sprintf("Error in reading %s file:   #%s ", yamlFileName, err), yamlFileName))
+		return
 	}
 
 	// Value returned is a marshaled go type (CSV Struct).
 	csv, err := unmarshal(rawYaml)
 	if err != nil {
-		return validator.InvalidParse(fmt.Sprintf("Error unmarshalling YAML to OLM's csv type for %s file:  #%s ", yamlFileName, err), yamlFileName)
+		manifestResult.Errors = append(manifestResult.Errors, validator.InvalidParse(fmt.Sprintf("Error unmarshalling YAML to OLM's csv type for %s file:  #%s ", yamlFileName, err), yamlFileName))
+		return
 	}
 
 	v := &CSVValidator{}
 	if err := v.AddObjects(csv); err != (validator.Error{}) {
-		return err // TODO: update when 'AddObjects' returns an actual error.
+		manifestResult.Errors = append(manifestResult.Errors, err)
+		return // TODO: update when 'AddObjects' returns an actual error.
 	}
-	fmt.Println("Running", v.Name())
+	fmt.Println("\nRunning", v.Name())
 	for _, errorLog := range v.Validate() {
 		fmt.Println("Validating CSV", errorLog.Name)
-
+		fmt.Println()
 		getErrorsFromManifestResult(errorLog.Warnings)
 
 		// There is no mandatory field thats missing if errorLog.errors is nil.
 		if errorLog.Errors != nil {
 			fmt.Println()
 			getErrorsFromManifestResult(errorLog.Errors)
-			fmt.Printf("Populate all the mandatory fields missing from CSV %s.", csv.GetName())
-			return validator.Error{}
+			fmt.Printf("Populate all the mandatory fields missing from CSV %s.\n", csv.GetName())
+			return
 		}
 	}
-	fmt.Printf("%s is verified.\n", yamlFileName)
-	return validator.Error{}
+	fmt.Printf("\n%s is verified.\n", yamlFileName)
+	return
 }
 
 // Iterates over the list of warnings and errors.
@@ -72,11 +75,18 @@ func unmarshal(rawYAML []byte) (olm.ClusterServiceVersion, error) {
 
 	rawJson, err := yaml.YAMLToJSON(rawYAML)
 	if err != nil {
-		fmt.Printf("error parsing raw YAML to Json: %s", err)
-		return olm.ClusterServiceVersion{}, err
+		return olm.ClusterServiceVersion{}, fmt.Errorf("error parsing raw YAML to Json: %s", err)
 	}
 	if err := json.Unmarshal(rawJson, &csv); err != nil {
 		return olm.ClusterServiceVersion{}, fmt.Errorf("error parsing CSV list (JSON) : %s", err)
 	}
 	return csv, nil
+}
+
+func ValidateManifest(manifestDirectory string) []validator.ManifestResult {
+	manRes := []validator.ManifestResult{}
+	for _, bundle := range ParseDir(manifestDirectory).Bundle {
+		manRes = append(manRes, ValidateCSVManifest(bundle.CSV))
+	}
+	return manRes
 }

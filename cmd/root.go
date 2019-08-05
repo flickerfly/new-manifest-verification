@@ -7,6 +7,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(verifyCmd)
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "operator-verify",
 	Short: "New Manifest Verification Tool Prototype",
@@ -18,6 +22,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		fmt.Println("INSIDE EXECUTE")
 		fmt.Println(err)
 		os.Exit(1)
 	}
