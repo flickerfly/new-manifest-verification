@@ -9,6 +9,7 @@ import (
 	"github.com/dweepgogia/new-manifest-verification/pkg/validate/validator"
 	"github.com/pkg/errors"
 
+
 	olm "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
 )
 
@@ -163,3 +164,4 @@ func isEmptyValue(v reflect.Value) bool {
 		panic(fmt.Sprintf("%v kind is not supported.", v.Kind()))
 	}
 }
+

@@ -80,3 +80,4 @@ func unmarshal(rawYAML []byte) (olm.ClusterServiceVersion, error) {
 	}
 	return csv, nil
 }
+
