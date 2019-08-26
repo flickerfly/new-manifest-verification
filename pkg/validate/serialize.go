@@ -125,3 +125,4 @@ func ValidateManifest(manifestDirectory string) []validator.ManifestResult {
 	validateBundle(manifest)
 	return []validator.ManifestResult{}
 }
+
