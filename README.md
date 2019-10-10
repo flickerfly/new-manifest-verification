@@ -10,9 +10,23 @@ The Operator Manifest Verfication library defines a single definition of a valid
 Currently, you can use this library with a command line tool:
 
 ## Command Line Tool
-You can install the `operator-verify` tool from source using:
+### Install
+You must have golang installed and configured.
 
-`$ go install`
+You must have these dependencies installed.
+```
+$ go get golang.org/x/net/http2 github.com/modern-go/reflect2 github.com/json-iterator/go k8s.io/utils/pointer sigs.k8s.io/yaml k8s.io/apiserver/pkg/util/webhook github.com/go-openapi/validate github.com/go-openapi/strfmt github.com/go-openapi/errors gopkg.in/yaml.v2 github.com/operator-framework/operator-lifecycle-manager github.com/ghodss/yaml github.com/spf13/pflag github.com/spf13/cobra k8s.io/component-base/featuregate k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
+```
+
+You can install the `operator-verify` tool from source using:
+```
+$ go get github.com/dweepgogia/new-manifest-verification
+$ cd $(go env GOPATH)/src/github.com/dweepgogia/new-manifest-verification/cmd
+$ go install
+```
+
+### Check you $PATH
+This adds your workspace's bin subdirectory to your PATH. As a result, you can use the `operator-verify` tool anywhere on your system. Otherwise, you would have to `cd` to your workspace's `bin` directory to run the executable. 
 
 `$ echo $PATH`
 
@@ -20,8 +34,7 @@ If you do not have `$(go env GOPATH)/bin` in your `$PATH`,
 
 `$ export PATH=$PATH:$(go env GOPATH)/bin`
 
-This adds your workspace's bin subdirectory to your PATH. As a result, you can use the `operator-verify` tool anywhere on your system. Otherwise, you would have to `cd` to your workspace's `bin` directory to run the executable. 
-
+### Usage
 To verify your ClusterServiceVersion yaml,
 
 `$ operator-verify verify /path/to/filename.yaml`
